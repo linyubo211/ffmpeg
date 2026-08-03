@@ -1,0 +1,44 @@
+name: Build and Package Docker Image
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build-and-pack:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 1. 设置 Docker Buildx
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # 2. 本地构建镜像（load 到 runner 环境中，不推送远程）
+      - name: Build Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          load: true
+          tags: iptv-tester:latest
+
+      # 3. 导出为 tar 并用 gzip 压缩
+      - name: Export and Compress Docker Image
+        run: |
+          echo "正在导出 Docker 镜像..."
+          docker save iptv-tester:latest -o iptv-tester.tar
+          
+          echo "正在使用 gzip 压缩镜像..."
+          gzip iptv-tester.tar
+          
+          ls -lh iptv-tester.tar.gz
+
+      # 4. 上传打包好的文件到 GitHub Actions 网页端
+      - name: Upload Compressed Image Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: iptv-tester-image
+          path: iptv-tester.tar.gz
+          retention-days: 7   # 文件在网页端保留 7 天，足够下载
