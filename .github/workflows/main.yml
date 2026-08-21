@@ -39,6 +39,10 @@ jobs:
           images: |
             ghcr.io/${{ github.repository_owner }}/iptv-tester
             ${{ secrets.DOCKERHUB_USERNAME }}/iptv-tester
+          tags: |
+            # 当推送到 main 分支时，自动同时打上 latest 和 main 标签
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=branch
 
       # 4. 构建并同时推送至两个镜像仓库
       - name: Build and push Docker image
