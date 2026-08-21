@@ -92,37 +92,49 @@ def test_stream_traffic(name, url, index, total):
 
 def main():
     if len(sys.argv) < 2:
-        print("错误: 请指定 M3U 播放源网址。", flush=True)
+        print("错误: 请至少指定一个 M3U 播放源网址。", flush=True)
         return
 
-    target_url = sys.argv[1]
-    print(f"=== IPTV 流量测速程序启动 ===", flush=True)
+    # 获取命令行传入的所有 M3U 网址
+    target_urls = sys.argv[1:]
+    print(f"=== IPTV 流量测速程序启动 (共收到 {len(target_urls)} 个订阅源) ===", flush=True)
     
-    content = fetch_m3u_content(target_url)
-    if not content:
+    all_tasks = []
+    
+    # 循环遍历并下载解析每一个 M3U 链接
+    for idx, target_url in enumerate(target_urls, 1):
+        print(f"\n[{idx}/{len(target_urls)}] 正在下载解析订阅源: {target_url}", flush=True)
+        content = fetch_m3u_content(target_url)
+        if not content:
+            continue
+
+        groups = {}
+        lines = content.split('\n')
+        for i in range(len(lines)):
+            if lines[i].startswith('#EXTINF') and i+1 < len(lines):
+                url = lines[i+1].strip()
+                if url.startswith('http'):
+                    ip_port = urlparse(url).netloc
+                    if not ip_port: continue
+                    if ip_port not in groups: groups[ip_port] = []
+                    name_match = re.search(r',(.+)$', lines[i])
+                    name = name_match.group(1).strip() if name_match else "Unknown"
+                    groups[ip_port].append((name, url))
+
+        # 每个 IP 随机抽样
+        for ip_port, urls in groups.items():
+            samples = random.sample(urls, min(len(urls), SAMPLES_PER_IP))
+            for s in samples:
+                all_tasks.append((s[0], s[1]))
+
+    total_tasks = len(all_tasks)
+    if total_tasks == 0:
+        print("❌ 错误: 没有从任何网址中解析到有效的频道源。", flush=True)
         return
 
-    groups = {}
-    lines = content.split('\n')
-    for i in range(len(lines)):
-        if lines[i].startswith('#EXTINF') and i+1 < len(lines):
-            url = lines[i+1].strip()
-            if url.startswith('http'):
-                ip_port = urlparse(url).netloc
-                if not ip_port: continue
-                if ip_port not in groups: groups[ip_port] = []
-                name_match = re.search(r',(.+)$', lines[i])
-                name = name_match.group(1).strip() if name_match else "Unknown"
-                groups[ip_port].append((name, url))
+    print(f"\n📡 所有订阅源合并完毕，总计识别到 {total_tasks} 个频道样本，开始多线程流量压测...\n" + "="*50, flush=True)
 
-    tasks = []
-    for ip_port, urls in groups.items():
-        samples = random.sample(urls, min(len(urls), SAMPLES_PER_IP))
-        for s in samples:
-            tasks.append((s[0], s[1])) # (name, url)
-
-    total_tasks = len(tasks)
-    print(f"📡 识别到 {len(groups)} 个独立服务器源，共抽取 {total_tasks} 个频道样本进行流量压测...\n" + "="*50, flush=True)
+    # 之后的并发测速、数据聚合以及写入同名 traffic_summary.json 的逻辑保持不变...
 
     results = []
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
