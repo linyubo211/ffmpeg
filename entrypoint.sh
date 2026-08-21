@@ -1,2 +1,2 @@
 #!/bin/bash
-python test_script.py "$@"
+exec python test_script.py "$@"
