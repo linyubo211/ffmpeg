@@ -16,19 +16,31 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Log in to the Container registry
+      # 1. 登录到 GitHub Container Registry (ghcr.io)
+      - name: Log in to the GitHub Container registry
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # 2. 登录到 Docker Hub (需要提前在仓库 Secrets 配置)
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # 3. 提取多平台/多仓库的 Metadata 标签
       - name: Extract metadata (tags, labels)
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository_owner }}/iptv-tester
+          images: |
+            ghcr.io/${{ github.repository_owner }}/iptv-tester
+            ${{ secrets.DOCKERHUB_USERNAME }}/iptv-tester
 
+      # 4. 构建并同时推送至两个镜像仓库
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
