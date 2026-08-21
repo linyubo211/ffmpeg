@@ -95,13 +95,12 @@ def main():
         print("错误: 请至少指定一个 M3U 播放源网址。", flush=True)
         return
 
-    # 获取命令行传入的所有 M3U 网址
     target_urls = sys.argv[1:]
     print(f"=== IPTV 流量测速程序启动 (共收到 {len(target_urls)} 个订阅源) ===", flush=True)
     
-    all_groups = {} # 全局 IP 组字典，用于跨链接去重
+    all_groups = {} # 全局跨源去重 IP 字典
     
-    # 循环遍历并下载解析每一个 M3U 链接
+    # 依次下载并解析每一个 M3U 订阅源
     for idx, target_url in enumerate(target_urls, 1):
         print(f"\n[{idx}/{len(target_urls)}] 正在下载解析订阅源: {target_url}", flush=True)
         content = fetch_m3u_content(target_url)
@@ -115,7 +114,6 @@ def main():
                 if url.startswith('http'):
                     ip_port = urlparse(url).netloc
                     if not ip_port: continue
-                    # 全局合并：相同服务器 IP 归纳到同一组
                     if ip_port not in all_groups: 
                         all_groups[ip_port] = []
                     
@@ -124,18 +122,22 @@ def main():
                     all_groups[ip_port].append((name, url))
 
     all_tasks = []
-    # 全局每个唯一 IP 只随机抽样一次（最多抽 SAMPLES_PER_IP 个频道）
+    # 全局每个唯一 IP 组随机抽样
     for ip_port, urls in all_groups.items():
         samples = random.sample(urls, min(len(urls), SAMPLES_PER_IP))
         for s in samples:
             all_tasks.append((s[0], s[1]))
 
     total_tasks = len(all_tasks)
+    total_unique_ips = len(all_groups)
     if total_tasks == 0:
         print("❌ 错误: 没有从任何网址中解析到有效的频道源。", flush=True)
         return
 
-    print(f"\n📡 全局去重合并完毕，总计识别到 {total_tasks} 个唯一频道样本，开始多线程流量压测...\n" + "="*50, flush=True)
+    print(f"\n📡 所有订阅源下载并全局去重完毕！", flush=True)
+    print(f"👉 独立服务器 IP 总数: {total_unique_ips} 个", flush=True)
+    print(f"👉 抽取测速频道样本总数: {total_tasks} 个", flush=True)
+    print("="*50 + "\n", flush=True)
 
     results = []
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
