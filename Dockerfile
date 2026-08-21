@@ -3,7 +3,10 @@ FROM python:3.11-slim
 # 设置工作目录
 WORKDIR /app
 
-# 安装系统依赖：ffmpeg、curl、iputils-ping 等网络和测速工具
+# 设置 Python 输出不使用缓冲区，实现日志实时打印
+ENV PYTHONUNBUFFERED=1
+
+# 安装系统依赖
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     curl \
